@@ -222,4 +222,6 @@ def _load_mlpackage_controlnet(mlpackages_dir, model_version, compute_unit):
 
 
 def get_available_compute_units():
-    return tuple(cu for cu in ct.ComputeUnit._member_names_)
+    cu_names = ct.ComputeUnit._member_names_
+    # Directly convert the list to a tuple for better performance than the generator
+    return tuple(cu_names)
