@@ -12,12 +12,13 @@ def softmax(x, dim):
     # Reduction max
     max_x = x.max(dim=dim, keepdim=True).values
     # EW sub
-    x -= max_x
+    x.sub_(max_x)
     # Scale for EXP to EXP2, Activation EXP2
     scaled_x = x * (1 / math.log(2))
     exp_act = torch.exp2(scaled_x)
     # Reduction Sum + Inv
-    exp_sum_inv = 1 / exp_act.sum(dim=dim, keepdims=True)
+    exp_sum = exp_act.sum(dim=dim, keepdims=True)
+    exp_sum_inv = exp_sum.reciprocal_()
     # EW Mult
     return exp_act * exp_sum_inv
 
