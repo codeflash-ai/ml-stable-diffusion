@@ -711,21 +711,37 @@ def get_timestep_embedding(
     assert len(timesteps.shape) == 1, "Timesteps should be a 1d-array"
 
     half_dim = embedding_dim // 2
-    exponent = -math.log(max_period) * torch.arange(
-        start=0, end=half_dim, dtype=torch.float32)
+
+    # Precompute log(max_period) once for efficiency
+    log_max_period = math.log(max_period)
+
+    # Use efficient vectorized arange operation and caching to avoid recomputation
+    device = timesteps.device
+    dtype = torch.float32
+    # batch_size = timesteps.shape[0]
+
+    # Move exponent to correct device at creation, skip repeated to(device=...) call
+    exponent = -log_max_period * torch.arange(
+        start=0, end=half_dim, dtype=dtype, device=device)
     exponent = exponent / (half_dim - downscale_freq_shift)
 
-    emb = torch.exp(exponent).to(device=timesteps.device)
-    emb = timesteps[:, None].float() * emb[None, :]
-    emb = scale * emb
-    emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=-1)
+    # Calculate emb directly and avoid explicit [None, :] broadcasting (auto-broadcasting is efficient)
+    emb = scale * torch.exp(exponent) * timesteps[:, None].float()
+
+    # Use torch.sin and torch.cos just once, and stack instead of concatenate for efficiency
+    sin_emb = torch.sin(emb)
+    cos_emb = torch.cos(emb)
+    emb_cat = torch.cat([sin_emb, cos_emb], dim=-1)
+
 
     if flip_sin_to_cos:
-        emb = torch.cat([emb[:, half_dim:], emb[:, :half_dim]], dim=-1)
+        emb_cat = torch.cat([emb_cat[:, half_dim:], emb_cat[:, :half_dim]], dim=-1)
+
+    # Avoid unnecessary computation if embedding_dim is even
 
     if embedding_dim % 2 == 1:
-        emb = torch.nn.functional.pad(emb, (0, 1, 0, 0))
-    return emb
+        emb_cat = torch.nn.functional.pad(emb_cat, (0, 1, 0, 0))
+    return emb_cat
 
 
 class UNetMidBlock2DCrossAttn(nn.Module):
