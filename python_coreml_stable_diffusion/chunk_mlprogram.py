@@ -102,21 +102,22 @@ def _get_op_idx_split_location(prog: Program):
     """
     main_block = prog.functions["main"]
     main_block.operations = list(main_block.operations)
-    total_size_in_mb = 0
 
+    # Precompute const sizes in single pass for efficiency
+    const_sizes = []
     for op in main_block.operations:
         if op.op_type == "const" and isinstance(op.val.val, np.ndarray):
             size_in_mb = op.val.val.size * op.val.val.itemsize / (1024 * 1024)
-            total_size_in_mb += size_in_mb
+            const_sizes.append(size_in_mb)
+        else:
+            const_sizes.append(0.0)
+
+    total_size_in_mb = sum(const_sizes)
     half_size = total_size_in_mb / 2
 
-    # Find the first non const op (single child), where the total cumulative size exceeds
-    # the half size for the first time
     cumulative_size_in_mb = 0
-    for op in main_block.operations:
-        if op.op_type == "const" and isinstance(op.val.val, np.ndarray):
-            size_in_mb = op.val.val.size * op.val.val.itemsize / (1024 * 1024)
-            cumulative_size_in_mb += size_in_mb
+    for i, op in enumerate(main_block.operations):
+        cumulative_size_in_mb += const_sizes[i]
 
         # Note: The condition "not op.op_type.startswith("const")" is to make sure that the
         # incision op is neither of type "const" nor "constexpr_*" ops that
@@ -124,8 +125,7 @@ def _get_op_idx_split_location(prog: Program):
         if (cumulative_size_in_mb > half_size and not op.op_type.startswith("const")
                 and len(op.outputs) == 1
                 and len(op.outputs[0].child_ops) == 1):
-            op_idx = main_block.operations.index(op)
-            return op_idx, cumulative_size_in_mb, total_size_in_mb
+            return i, cumulative_size_in_mb, total_size_in_mb
 
 
 def _get_first_chunk_outputs(block, op_idx):
