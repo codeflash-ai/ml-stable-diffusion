@@ -590,15 +590,16 @@ class CoreMLStableDiffusionPipeline(DiffusionPipeline):
 
 
 def get_available_schedulers():
-    schedulers = {}
-    for scheduler in [DDIMScheduler,
-                      DPMSolverMultistepScheduler,
-                      EulerAncestralDiscreteScheduler,
-                      EulerDiscreteScheduler,
-                      LMSDiscreteScheduler,
-                      PNDMScheduler]:
-        schedulers[scheduler().__class__.__name__.replace("Scheduler", "")] = scheduler
-    return schedulers
+    # Avoid constructing scheduler instances just for their class names.
+    # We know the mapping already; hardcode for maximum efficiency.
+    return {
+        "DDIM": DDIMScheduler,
+        "DPMSolverMultistep": DPMSolverMultistepScheduler,
+        "EulerAncestralDiscrete": EulerAncestralDiscreteScheduler,
+        "EulerDiscrete": EulerDiscreteScheduler,
+        "LMSDiscrete": LMSDiscreteScheduler,
+        "PNDM": PNDMScheduler,
+    }
 
 
 SCHEDULER_MAP = get_available_schedulers()
