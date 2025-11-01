@@ -290,8 +290,8 @@ def register_input_preprocessing_hook(pipe):
         if len(timestep.shape) == 0:
             timestep = timestep[None]
         timestep = timestep.expand(sample.shape[0])
-        encoder_hidden_states = kwargs["encoder_hidden_states"]
-        encoder_hidden_states = encoder_hidden_states.permute((0, 2, 1)).unsqueeze(2)
+        # In-place permutation and unsqueeze by using out-of-place ops (as before)
+        encoder_hidden_states = kwargs["encoder_hidden_states"].permute(0, 2, 1).unsqueeze(2)
         modified_args = (sample, timestep, encoder_hidden_states)
         return (modified_args, {})
 
@@ -301,8 +301,12 @@ def prepare_pipe(pipe, unet):
     """
     Create a new pipeline from `pipe` with `unet` as the noise predictor
     """
+    # Use shallow copy for pipe except for .unet assignment for significant memory savings
+    # This assumes downstream code only requires deep copy if necessary for other fields. But as
+    # behavior preservation is critical, keep deepcopy but move .to() before deepcopy to save time.
+    device = pipe.unet.device
+    unet.to(device)
     new_pipe = deepcopy(pipe)
-    unet.to(new_pipe.unet.device)
     new_pipe.unet = unet
     pre_hook_handle = register_input_preprocessing_hook(new_pipe)
     return new_pipe, pre_hook_handle
