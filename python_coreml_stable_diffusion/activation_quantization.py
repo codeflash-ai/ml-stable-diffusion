@@ -204,13 +204,25 @@ def quantize(model, config, calibration_data):
 
 def get_quantizable_modules(unet):
     quantizable_modules = []
+    conv2d_type = torch.nn.modules.conv.Conv2d
+    einsum_type = Einsum
+
+    # Pre-bind frequent method and localize types for faster lookup
+    children = torch.nn.Module.children
+
+    # Use local variables for append for micro-optimization
+    qm_append = quantizable_modules.append
+
     for name, module in unet.named_modules():
-        if len(list(module.children())) > 0:
+        # Use iterator and next to check for children efficiently
+        if next(children(module), None) is not None:
             continue
-        if type(module) == torch.nn.modules.conv.Conv2d:
-            quantizable_modules.append(('conv', name))
-        if type(module) == Einsum:
-            quantizable_modules.append(('einsum', name))
+
+        mtype = type(module)
+        if mtype is conv2d_type:
+            qm_append(('conv', name))
+        if mtype is einsum_type:
+            qm_append(('einsum', name))
 
     return quantizable_modules
 
