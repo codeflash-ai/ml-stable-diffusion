@@ -24,6 +24,13 @@ import torch.nn.functional as F
 
 # Ensure minimum macOS version requirement is met for this particular model
 from coremltools.models.utils import _macos_version
+
+_SILU = nn.SiLU()
+
+_MISH = nn.Mish()
+
+_GELU = nn.GELU()
+
 if not _macos_version() >= (13, 1):
     logger.warning(
         "!!! macOS 13.1 and newer or iOS/iPadOS 16.2 and newer is required for best performance !!!"
@@ -619,11 +626,11 @@ class GEGLU(nn.Module):
 
 def get_activation(act_fn):
     if act_fn in ["swish", "silu"]:
-        return nn.SiLU()
+        return _SILU
     elif act_fn == "mish":
-        return nn.Mish()
+        return _MISH
     elif act_fn == "gelu":
-        return nn.GELU()
+        return _GELU
     else:
         raise ValueError(f"Unsupported activation function: {act_fn}")
 
